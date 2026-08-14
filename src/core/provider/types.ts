@@ -32,4 +32,5 @@ export interface AiProvider {
   readonly kind: string
   complete(config: ProviderConfig, request: ChatCompletionRequest, signal?: AbortSignal): Promise<ChatCompletionResult>
   testConnection(config: ProviderConfig, signal?: AbortSignal): Promise<{ ok: boolean; message: string }>
+  listModels?(config: ProviderConfig, signal?: AbortSignal): Promise<string[]>
 }
