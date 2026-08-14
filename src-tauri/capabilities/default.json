@@ -3,5 +3,17 @@
   "identifier": "default",
   "description": "Default desktop capability for AI Board Arena",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "store:default",
+    "stronghold:default",
+    "stronghold:allow-remove-store-record",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "http://**" },
+        { "url": "https://**" }
+      ]
+    }
+  ]
 }
