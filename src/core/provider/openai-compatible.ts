@@ -63,11 +63,17 @@ export class OpenAiCompatibleProvider implements AiProvider {
     }
   }
 
+  async listModels(config: ProviderConfig, signal?: AbortSignal): Promise<string[]> {
+    const response = await runtimeFetch(`${normalizeBaseUrl(config.baseUrl)}/models`, { headers: headers(config), signal })
+    if (!response.ok) throw new Error(`PROVIDER_HTTP_ERROR: ${await readError(response)}`)
+    const body = await response.json() as { data?: Array<{ id?: string }> }
+    return (body.data ?? []).map((item) => item.id).filter((id): id is string => Boolean(id)).sort()
+  }
+
   async testConnection(config: ProviderConfig, signal?: AbortSignal): Promise<{ ok: boolean; message: string }> {
     try {
-      const response = await runtimeFetch(`${normalizeBaseUrl(config.baseUrl)}/models`, { headers: headers(config), signal })
-      if (!response.ok) return { ok: false, message: await readError(response) }
-      return { ok: true, message: 'Provider reachable' }
+      const models = await this.listModels(config, signal)
+      return { ok: true, message: models.length ? `${models.length} models available` : 'Provider reachable' }
     } catch (error) {
       return { ok: false, message: error instanceof Error ? error.message : String(error) }
     }
