@@ -19,21 +19,31 @@ async function readError(response: Response): Promise<string> {
   }
 }
 
+async function postCompletion(config: ProviderConfig, request: ChatCompletionRequest, signal: AbortSignal | undefined, includeResponseFormat: boolean): Promise<Response> {
+  return fetch(`${normalizeBaseUrl(config.baseUrl)}/chat/completions`, {
+    method: 'POST',
+    headers: headers(config),
+    signal,
+    body: JSON.stringify({
+      model: config.model,
+      messages: request.messages,
+      temperature: config.temperature ?? 0.7,
+      ...(includeResponseFormat && request.responseFormat === 'json_object' ? { response_format: { type: 'json_object' } } : {})
+    })
+  })
+}
+
 export class OpenAiCompatibleProvider implements AiProvider {
   readonly kind = 'openai-compatible'
 
   async complete(config: ProviderConfig, request: ChatCompletionRequest, signal?: AbortSignal): Promise<ChatCompletionResult> {
-    const response = await fetch(`${normalizeBaseUrl(config.baseUrl)}/chat/completions`, {
-      method: 'POST',
-      headers: headers(config),
-      signal,
-      body: JSON.stringify({
-        model: config.model,
-        messages: request.messages,
-        temperature: config.temperature ?? 0.7,
-        ...(request.responseFormat === 'json_object' ? { response_format: { type: 'json_object' } } : {})
-      })
-    })
+    let response = await postCompletion(config, request, signal, true)
+
+    // Some local OpenAI-compatible servers support chat/completions but not response_format.
+    // Retry once without that optional field to maximize Ollama/LM Studio/custom endpoint compatibility.
+    if (!response.ok && request.responseFormat === 'json_object' && [400, 404, 422].includes(response.status)) {
+      response = await postCompletion(config, request, signal, false)
+    }
 
     if (!response.ok) throw new Error(`PROVIDER_HTTP_ERROR: ${await readError(response)}`)
 
