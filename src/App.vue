@@ -5,6 +5,7 @@ import { builtinPersonalities, resolvePersonality } from './core/personality/pro
 import type { ProviderConfig } from './core/provider/types'
 import type { DouShouQiSide } from './games/dou-shou-qi/domain/types'
 
+const seats: readonly DouShouQiSide[] = ['blue', 'red']
 let session = createM2Session()
 const snapshot = shallowRef(session.match.snapshot())
 const boardComponent = session.ui.boardComponent
@@ -24,7 +25,7 @@ const personalityIds = reactive<Record<DouShouQiSide, string>>({ blue: 'veteran-
 const legalActionCount = computed(() => session.match.legalActions().length)
 
 function configureAgents() {
-  for (const seat of ['blue', 'red'] as const) {
+  for (const seat of seats) {
     if (!configs[seat].baseUrl.trim() || !configs[seat].model.trim()) throw new Error(`${seat.toUpperCase()}_PROVIDER_NOT_CONFIGURED`)
     session.controller.configureSeat(seat, { provider: { ...configs[seat] }, personality: resolvePersonality(personalityIds[seat]) })
   }
@@ -114,7 +115,7 @@ function resetMatch() {
       <p class="lead">AI 才是棋手。你只能影响它，不能替它走棋。</p>
 
       <section class="providers">
-        <div v-for="seat in (['blue','red'] as const)" :key="seat" class="provider-card">
+        <div v-for="seat in seats" :key="seat" class="provider-card">
           <div class="provider-title"><strong>{{ seat.toUpperCase() }} AI</strong><span>{{ connectionStatus[seat] }}</span></div>
           <input v-model="configs[seat].baseUrl" placeholder="Base URL，例如 http://127.0.0.1:11434/v1" />
           <input v-model="configs[seat].model" placeholder="Model，例如 qwen3:14b" />
@@ -129,7 +130,7 @@ function resetMatch() {
       <section class="commander-card">
         <div class="commander-head">
           <strong>Commander</strong>
-          <select v-model="commanderSeat" :disabled="running && false"><option value="blue">指挥 Blue</option><option value="red">指挥 Red</option></select>
+          <select v-model="commanderSeat"><option value="blue">指挥 Blue</option><option value="red">指挥 Red</option></select>
         </div>
         <textarea v-model="commanderText" rows="3" placeholder="例如：别急着冲兽穴，我觉得右侧的鼠可以制造点麻烦。" @keydown.ctrl.enter.prevent="sendCommanderMessage" />
         <button class="ghost" @click="sendCommanderMessage">发送给己方 AI</button>
