@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": ".tmp-core"
+  },
+  "include": [
+    "src/core/**/*.ts",
+    "src/games/dou-shou-qi/domain/**/*.ts",
+    "src/games/dou-shou-qi/ai/**/*.ts",
+    "src/games/dou-shou-qi/module.ts"
+  ]
+}
