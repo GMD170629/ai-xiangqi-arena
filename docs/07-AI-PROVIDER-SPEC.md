@@ -2,69 +2,100 @@
 
 ## 目标
 
-允许玩家使用自己的 AI，而不是被绑定到游戏官方模型。
+让用户可以使用自己的 AI 参加对局，包括：
 
-## 首版协议
+- 本地模型。
+- 局域网模型服务。
+- 云端兼容 API。
 
-以 OpenAI Compatible Chat API 为第一接入协议。
+平台业务层只依赖统一 Provider Contract。
 
-Provider 配置：
+## MVP 接入标准
 
-```ts
-interface AIProviderConfig {
-  id: string
-  name: string
-  baseUrl: string
-  apiKey?: string
-  model: string
-  timeoutMs: number
-}
+首版优先支持 **OpenAI Compatible Chat API**。
+
+用户配置：
+
+```text
+Name
+Base URL
+API Key (optional for local)
+Model
 ```
 
-## 地址范围
+典型场景：
 
-允许：
-- localhost
-- 127.0.0.1
-- 局域网 IP
-- HTTPS 云端 API
+```text
+localhost model server
+LAN model server
+self-hosted compatible gateway
+cloud compatible endpoint
+```
 
-因此桌面客户端应避免受浏览器 CORS 模型限制。
+## Provider Contract
 
-## Provider 抽象
+建议：
 
 ```ts
 interface AIProvider {
-  testConnection(): Promise<ConnectionResult>
-  listModels?(): Promise<ModelInfo[]>
-  complete(request: AICompletionRequest): Promise<AICompletionResponse>
+  id: string
+  testConnection(config: ProviderConfig): Promise<ConnectionResult>
+  listModels?(config: ProviderConfig): Promise<ModelInfo[]>
+  complete(request: ProviderRequest): Promise<ProviderResponse>
 }
 ```
 
-业务层只依赖接口，不依赖 Ollama、LM Studio 等产品名称。
+AI Runtime 不得出现：
 
-## 首版配置体验
+```ts
+if (provider === "ollama")
+if (provider === "xxx")
+```
 
-新增 AI：
-1. Provider 名称。
-2. Base URL。
-3. API Key（可选）。
-4. Model。
-5. 测试连接。
-6. 保存。
+Provider 差异只存在 adapter 内。
+
+## Capability
+
+建议 Provider/Profile 可以声明：
+
+```ts
+interface ProviderCapabilities {
+  streaming: boolean
+  structuredOutput: boolean
+  systemMessages: boolean
+  modelListing: boolean
+}
+```
+
+AI Protocol 根据 capability 做降级，但不能改变 Game Rules。
+
+## 本地模型体验
+
+桌面客户端应允许：
+
+- `127.0.0.1` / `localhost`
+- 私有 LAN 地址
+- HTTP（仅本地/明确允许场景）
+- HTTPS 云端地址
+
+后续可以增加常见本地服务自动探测，但不作为 M1 前置条件。
 
 ## 安全
 
-- API Key 只存本地安全存储。
-- 日志中永不输出完整 API Key。
-- 对局导出不得携带 API Key。
-- UI 默认对 Key 做掩码。
+- API Key 使用系统安全存储或 Tauri 对应安全方案。
+- Key 不写日志。
+- Key 不进入 Match Record。
+- 导出对局不得包含 Provider secret。
+- UI 必须显示请求将发送到哪个 Base URL。
 
-## 模型能力差异
+## 可复现信息
 
-首版不要假设模型必然支持：
-- Structured Outputs
-- Tool Calling
-- Reasoning 参数
+对局记录可以保存：
 
-最基础兼容路径应能通过普通 chat completion + JSON 文本解析工作。
+- Provider profile ID
+- provider type
+- model name
+- endpoint category（local/lan/cloud）
+- sampling 参数
+
+但不保存 secret。

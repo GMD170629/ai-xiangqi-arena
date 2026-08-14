@@ -1,48 +1,68 @@
 # 09 · 数据模型
 
-## Game
+## 原则
+
+持久化模型必须以 `gameId + rulesVersion + generic action/state payload` 支持多游戏，不能建立斗兽棋专属的顶层数据库结构。
+
+## GameDefinition
 
 ```ts
-interface Game {
-  id: string
-  status: GameStatus
-  redPlayerId: string
-  blackPlayerId: string
-  commanderSide?: 'red' | 'black'
-  currentSide: 'red' | 'black'
-  fen: string
-  result?: GameResult
-  createdAt: string
-  finishedAt?: string
-}
-```
-
-## AIPlayer
-
-```ts
-interface AIPlayer {
-  id: string
-  displayName: string
-  providerConfigId: string
-  personalityId: string
-}
-```
-
-## MoveRecord
-
-```ts
-interface MoveRecord {
-  id: string
+interface GameDescriptor {
   gameId: string
-  ply: number
-  side: 'red' | 'black'
-  move: string
-  fenBefore: string
-  fenAfter: string
-  aiMessage?: string
-  requestDurationMs?: number
-  retryCount: number
+  name: string
+  moduleVersion: string
+  rulesVersion: string
+}
+```
+
+## Match
+
+```ts
+interface MatchRecord {
+  id: string
+  game: GameDescriptor
+  status: MatchStatus
+  seats: MatchSeat[]
   createdAt: string
+  startedAt?: string
+  finishedAt?: string
+  outcome?: GameOutcome
+}
+```
+
+## MatchSeat
+
+```ts
+interface MatchSeat {
+  seatId: string
+  aiProfileId: string
+  personalityId: string
+  commanderEnabled: boolean
+}
+```
+
+不要假定 seat 一定叫红/黑。具体 seat ID 由 GameManifest 定义。
+
+## AI Profile
+
+```ts
+interface AIProfile {
+  id: string
+  name: string
+  providerProfileId: string
+  model: string
+  modelParams?: Record<string, unknown>
+}
+```
+
+## Personality
+
+```ts
+interface PersonalityRecord {
+  id: string
+  name: string
+  prompt: string
+  version: string
 }
 ```
 
@@ -51,56 +71,80 @@ interface MoveRecord {
 ```ts
 interface CommanderMessage {
   id: string
-  gameId: string
-  side: 'red' | 'black'
+  matchId: string
+  seatId: string
   text: string
-  status: 'pending' | 'consumed'
+  status: "pending" | "consumed" | "acknowledged"
   createdAt: string
   consumedAt?: string
 }
 ```
 
-## Personality
+## Turn / Action Event
 
 ```ts
-interface Personality {
+interface ActionRecord {
   id: string
-  name: string
-  tagline: string
-  description: string
-  prompt: string
-  builtIn: boolean
-  version: string
+  matchId: string
+  turn: number
+  seatId: string
+  actionId: string
+  actionPayload: unknown
+  displayText: string
+  stateHashBefore: string
+  stateHashAfter: string
+  createdAt: string
 }
 ```
 
-## ProviderConfig
+`actionPayload` 由 GameModule 序列化；Core 不查询其中的游戏语义。
 
-API Key 字段不应进入普通对局导出数据。
+## AI Invocation
 
-```ts
-interface ProviderConfig {
-  id: string
-  name: string
-  baseUrl: string
-  model: string
-  timeoutMs: number
-  secretRef?: string
-}
+建议记录：
+
+- turn
+- attempt
+- provider profile ID
+- model
+- protocol version
+- prompt version
+- personality version
+- latency
+- usage/token（如果 Provider 提供）
+- response status
+- parse/validation error code
+
+默认不必永久保存完整原始 Prompt；可以提供开发日志模式。
+
+任何情况下都不记录 API Key。
+
+## Snapshot 与 Replay
+
+完整回放至少需要：
+
+```text
+gameId
+rulesVersion
+initial configuration
+ordered ActionRecords
 ```
 
-## GameEvent
+GameRules 必须具备 deterministic apply，才能从初始状态重放到任意 turn。
 
-推荐事件化记录：
-- GAME_STARTED
-- COMMANDER_MESSAGE_SENT
-- AI_REQUEST_STARTED
-- AI_RESPONSE_RECEIVED
-- AI_RESPONSE_INVALID
-- MOVE_VALIDATED
-- MOVE_APPLIED
-- CHECK
-- GAME_FINISHED
-- GAME_ERROR
+可以周期性保存 State Snapshot 加速长局加载，但 Snapshot 是优化，不是规则真相。
 
-事件记录用于调试、回放和未来 Benchmark。
+## 技术性终局
+
+Outcome 要区分：
+
+```text
+GAME_WIN
+GAME_DRAW
+RESIGNATION
+AI_FAILURE
+PROVIDER_FAILURE
+ABORTED
+```
+
+这样 Benchmark 数据不会把 API 故障误统计为正常棋力结果。

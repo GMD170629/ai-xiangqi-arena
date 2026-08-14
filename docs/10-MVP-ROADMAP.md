@@ -1,82 +1,106 @@
-# 10 · MVP 路线图
+# 10 · MVP Roadmap
 
 ## M0 · 产品与协议定型
 
-状态：当前阶段。
+状态：**当前阶段，核心方向已完成调整。**
+
+产出：
+- Platform-first 产品定义。
+- AI vs AI + Commander 核心规则。
+- GameModule Contract。
+- 通用 AI Protocol。
+- 斗兽棋 `classic-v1` 规则锁定。
+- 斗兽棋 Presentation 资源边界。
+- Codex `AGENTS.md` 约束。
+
+## M1 · 工程骨架 + Core Contracts + 斗兽棋规则
+
+目标：没有真实 AI、没有漂亮 UI，也能证明多游戏架构成立。
+
+实现：
+
+- Tauri 2 + Vue 3 + TypeScript 项目初始化。
+- `core/game-contracts`。
+- Game Registry。
+- Match Runtime 基础状态机。
+- `games/dou-shou-qi/domain`。
+- `classic-v1` 全部规则。
+- Action codec。
+- deterministic replay。
+- 完整规则单元测试。
 
 验收：
-- README 与产品规则完成。
-- AI Protocol 定义完成。
-- Provider 边界完成。
-- 人格与 Commander 交互完成。
 
-## M1 · Xiangqi Rules + Game Runtime
+> 测试代码可以创建斗兽棋初始 State、生成合法 Action、apply、判断终局，并且 Core 不 import 斗兽棋领域类型。
 
-目标：完全不接 AI，也能通过测试驱动棋局状态机。
+## M2 · AI Runtime + Provider
 
-验收：
-- 标准初始棋盘。
-- 合法走法校验。
-- 将军/将死/和棋。
-- 回合推进。
-- 规则单元测试。
-- 不存在任何棋步评价算法。
+实现：
 
-## M2 · AI Runtime
-
-目标：单个真实 AI 能根据当前棋盘返回合法走法。
-
-验收：
+- 通用 Turn Request。
+- GameAIAdapter。
 - OpenAI Compatible Provider。
-- Base URL / Key / Model 配置。
-- Prompt Builder。
-- JSON 解析。
-- 非法着重试。
-- 超时处理。
-
-## M3 · AI vs AI
-
-目标：两个真实 AI 可以从开局自动运行到终局或明确技术失败。
-
-这是首个核心里程碑。
-
-## M4 · Commander
-
-目标：人类可以通过自然语言影响己方 AI。
+- Fake Provider。
+- parse/illegal/retry/timeout。
+- Personality Prompt。
+- Commander message lifecycle。
 
 验收：
-- 发送指令。
-- 下一回合注入。
-- AI 反馈 accepted / partial / rejected。
-- 仍然没有任何直接走棋入口。
 
-## M5 · Personality + Fun
+> 两个 Fake/真实 AI 可以在 headless 模式下完成一整局斗兽棋，所有实际 Action 都来自 AI Response。
 
-目标：让 AI 成为“角色”。
+## M3 · 可玩的桌面对局
+
+实现：
+
+- Match 创建页。
+- 双方 AI 配置。
+- Provider 设置。
+- Personality 选择/自定义。
+- 斗兽棋棋盘。
+- Commander 面板。
+- 动作历史。
+- 暂停、继续、重开、认输。
 
 验收：
-- 4 个内置人格。
-- 自定义人格。
-- 思考/落子/将军/拒绝/非法着/胜负动效。
-- Reduced Motion。
-- 趣味提示池。
 
-## M6 · 首版打磨
+> 普通用户可以连接自己的 AI，选择一方作为 Commander，完整玩完一局。
 
-- 对局记录。
-- Provider 管理。
-- 错误日志。
-- 首次使用引导。
-- 复赛。
-- 基础设置。
-- 安装包构建。
+## M4 · 动效与趣味体验
 
-## MVP 最终验收
+实现：
 
-用户能在一台电脑上：
-1. 配置两个自己的 AI。
-2. 给其中一方选择人格并作为 Commander。
-3. 开始一局 AI vs AI 象棋。
-4. 全程不直接移动任何棋子。
-5. 通过自然语言影响己方 AI。
-6. 看到 AI 自主完成对局，并获得清晰、有趣的过程反馈。
+- AI 思考状态。
+- 动物移动/捕获。
+- 鼠入水。
+- 狮虎跳河。
+- 陷阱/兽穴关键反馈。
+- 人格化回应。
+- 非法 Action 趣味提示。
+- 结算页。
+
+原则：先正确，再有趣；动画绝不侵入规则状态机。
+
+## M5 · 稳定性与对局数据
+
+- Match record。
+- Replay。
+- Provider 失败恢复。
+- 对局统计。
+- 性能与日志。
+- 安全存储 API Key。
+- 打包 Windows/macOS。
+
+## MVP Done
+
+当满足以下条件，首版核心验证完成：
+
+1. 用户可以用自己的本地或云端 AI。
+2. AI vs AI 能稳定完成斗兽棋。
+3. 玩家只能通过 Commander 影响己方 AI。
+4. Personality 对体验有明显影响。
+5. 斗兽棋具有足够的动画和趣味性。
+6. Core 与 GameModule 解耦。
+7. 新增第二种游戏时不需要重写 AI/Match/Commander。
+
+MVP 之后再决定第二个游戏优先做 **五子棋** 还是 **中国象棋**，而不是提前实现。

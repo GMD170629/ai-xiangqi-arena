@@ -2,116 +2,180 @@
 
 ## 目标
 
-AI Protocol 定义游戏如何把“棋局 + 玩家指令 + AI 人格”交给模型，以及模型如何返回走法。
+AI Protocol 定义平台如何把 **当前游戏状态 + 合法 Action + Commander 消息 + Personality** 交给模型，以及模型如何返回最终 Action。
 
-协议必须保持 Provider 无关。
+协议必须同时做到：
+
+- Provider 无关。
+- Game 无关。
+- 不要求模型输出隐藏推理链。
+- 能让不同棋类复用同一套 AI Runtime。
 
 ## Turn Request
 
-逻辑结构示例：
+逻辑结构：
 
 ```json
 {
-  "protocolVersion": "0.1",
-  "game": "xiangqi",
-  "gameId": "game_xxx",
-  "turn": 17,
-  "side": "red",
-  "board": {
-    "fen": "..."
+  "protocolVersion": "0.2",
+  "matchId": "match_xxx",
+  "turn": 12,
+  "seat": "blue",
+  "game": {
+    "id": "dou-shou-qi",
+    "rulesVersion": "classic-v1"
+  },
+  "state": {
+    "machine": {},
+    "readable": "当前局面的人类可读描述"
   },
   "history": [
-    { "ply": 1, "move": "..." },
-    { "ply": 2, "move": "..." }
+    {
+      "turn": 11,
+      "seat": "red",
+      "action": "a7-a6",
+      "display": "鼠 a7 → a6"
+    }
   ],
-  "legalMoves": ["..."],
+  "legalActions": [
+    {
+      "id": "a3-a4",
+      "display": "象 a3 → a4"
+    }
+  ],
   "commanderMessages": [
     {
-      "text": "先稳一下右翼，不要着急兑子。",
+      "text": "别急着冲兽穴，我觉得右边有机会。",
       "createdAt": "..."
     }
   ],
   "personality": {
-    "name": "稳健老将",
+    "id": "calm-strategist",
     "prompt": "..."
   }
 }
 ```
 
-## Legal Moves
+`state.machine`、`state.readable`、`legalActions` 的具体内容完全由当前 `GameAIAdapter` 产生。
 
-首版默认采用 **Standard Mode**：向 AI 提供未排序的合法着列表，目的是减少小模型因规则理解不足产生的非法着。
+Core 不解析这些字段中的游戏语义。
 
-规则：
-- 合法着列表只能来自 Referee。
-- 不携带 score、rank、best、evaluation 等任何优劣信息。
-- 列表顺序不得按棋步质量排序。
+## Legal Actions
 
-后续可增加 Pure Mode：不传合法着，仅传棋盘与规则。
+MVP 使用 Standard Mode：
+
+- GameRules 生成合法 Action。
+- GameAIAdapter 序列化为稳定 ID + 可读描述。
+- 不包含 score、rank、evaluation、recommended 等优劣信息。
+- 不得按质量排序。
+- 排序应稳定且与棋力无关，便于测试与复现。
+
+未来可加入 Pure Mode，但不是 MVP 前置条件。
 
 ## AI Response
 
-推荐结构：
+最小输出：
 
 ```json
 {
-  "move": "...",
-  "message": "我会先稳住右翼，再寻找反击机会。",
-  "commanderReaction": "accepted"
+  "action": "a3-a4",
+  "message": "我先把象向前压，保留右路的压力。"
 }
 ```
 
-`commanderReaction` 可选：
-- `accepted`
-- `partially_accepted`
-- `rejected`
-- `no_instruction`
+可选：
 
-它只用于 UI 展示，不影响规则系统。
+```json
+{
+  "action": "a3-a4",
+  "message": "我先把象向前压。",
+  "commandResponse": "你的右路判断有道理，但我暂时不直接冲穴。"
+}
+```
 
-## 不要求 Chain of Thought
+### 字段语义
 
-产品不依赖模型输出完整内部推理链。
+- `action`：必须对应当前 GameAIAdapter 可解析的一个 Action。
+- `message`：面向玩家的简短决策说明。
+- `commandResponse`：对 Commander 最新消息的公开回应，可省略。
 
-`message` 应当是简短、面向玩家的决策说明，例如 1～3 句话。
+禁止依赖模型返回长篇 Chain of Thought 才能驱动游戏。
 
-## Prompt 层次
+## Prompt 分层
 
-建议上下文按以下层次构造：
+建议最终 Prompt 由以下层组成：
 
-1. Core System Rules
-2. Personality Prompt
-3. Current Game Context
-4. Commander Messages
-5. Output Schema
+```text
+Platform System Prompt
++ Personality Prompt
++ Game Rules Digest
++ Current State
++ Recent History
++ Legal Actions
++ Commander Messages
++ Output Contract
+```
 
-Core System Rules 不允许被人格或玩家指令覆盖。
+其中：
 
-## 重试协议
+- Platform Prompt 说明 AI 是真正的 Player。
+- Personality 只影响角色与表达/决策倾向。
+- Game Rules Digest 由 GameModule 提供。
+- Commander 只能建议，不能成为强制动作接口。
 
-### 格式错误
+## 对具体动作建议的处理
+
+玩家可以用自然语言说：
+
+> “要不要让鼠往前走一格？”
+
+这仍然只是建议。
+
+平台不能因此直接构造 Action。只有 AI Response 中返回的 `action` 才能进入规则校验。
+
+## 错误恢复
+
+### Parse Error
 
 返回：
-- 输出无法解析。
-- 重新只返回协议要求结构。
 
-### 非法着
+```json
+{
+  "type": "OUTPUT_PARSE_ERROR",
+  "message": "Return exactly one valid action using the required schema."
+}
+```
 
-返回：
-- 指定走法非法。
-- 简短错误原因。
-- 当前仍可选择的合法着。
-- 要求重新独立选择。
+### Illegal Action
 
-### 最大重试
+GameModule 返回结构化规则错误，例如：
 
-默认 3 次；可配置。
+```json
+{
+  "type": "ILLEGAL_ACTION",
+  "code": "RIVER_ENTRY_FORBIDDEN",
+  "message": "Only the rat may enter river squares in this rules version."
+}
+```
 
-## Prompt 版本化
+AI Runtime 将其作为下一次重试上下文。
 
-每盘记录：
-- protocolVersion
-- corePromptVersion
-- personalityVersion
+### Retry
 
-便于后续复现模型行为。
+MVP 默认：
+
+- 每回合最多 3 次规则/解析重试。
+- Provider timeout 可独立重试。
+- 达到限制后触发 `AI_FAILURE`。
+
+## 协议版本
+
+Protocol Version 与 Game Rules Version 分开：
+
+```text
+protocolVersion = 0.2
+gameId = dou-shou-qi
+rulesVersion = classic-v1
+```
+
+这样增加新游戏不需要创建新的 AI 协议。
