@@ -1,0 +1,5 @@
+@keyframes dsq-think-pulse { 0%, 100% { transform: scale(1); opacity: .72; } 50% { transform: scale(1.035); opacity: 1; } }
+@keyframes dsq-piece-enter { from { transform: scale(.86); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.dsq-piece { animation: dsq-piece-enter 180ms ease-out; }
+.dsq-thinking { animation: dsq-think-pulse 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .dsq-piece, .dsq-thinking { animation: none; } }

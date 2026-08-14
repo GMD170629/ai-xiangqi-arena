@@ -1,0 +1,12 @@
+.dsq-board { width: min(68vh, 560px); aspect-ratio: 7 / 9; display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: repeat(9, 1fr); gap: 2px; padding: 10px; border-radius: 24px; background: #604b32; box-shadow: 0 22px 60px rgba(45, 35, 25, .18); }
+.dsq-cell { position: relative; display: grid; place-items: center; border-radius: 8px; overflow: hidden; user-select: none; }
+.terrain-land { background: #d9c89f; }
+.terrain-river { background: linear-gradient(135deg, #8bc6d8, #70adc1); }
+.terrain-trap { background: repeating-linear-gradient(45deg, #d7b16d, #d7b16d 7px, #c99a51 7px, #c99a51 14px); }
+.terrain-den { background: radial-gradient(circle, #a97545 0 34%, #d7b16d 36%); }
+.coordinate { position: absolute; top: 3px; left: 4px; font-size: 9px; opacity: .38; }
+.dsq-piece { width: 72%; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; position: relative; box-shadow: 0 3px 8px rgba(0,0,0,.18); border: 2px solid rgba(255,255,255,.6); }
+.side-blue { background: #dbeaf4; }
+.side-red { background: #f6ded8; }
+.piece-glyph { font-size: clamp(20px, 3.2vw, 36px); line-height: 1; }
+.piece-label { position: absolute; bottom: 2px; font-size: 7px; text-transform: uppercase; opacity: .55; }
