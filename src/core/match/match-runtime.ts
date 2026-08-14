@@ -1,16 +1,17 @@
-import type { GameModule, SeatId } from '../game/contracts'
+import type { GameModule, GameOutcome, SeatId } from '../game/contracts'
 import type { DispatchResult, MatchHistoryEntry, MatchSnapshot } from './types'
 
 export class MatchRuntime<State, Action, Seat extends SeatId> {
   private state: State
   private history: MatchHistoryEntry<Action, Seat>[] = []
+  private externalOutcome: GameOutcome<Seat> | null = null
 
   constructor(private readonly game: GameModule<State, Action, Seat>, initialState?: State) {
     this.state = initialState ?? game.rules.createInitialState()
   }
 
   snapshot(): MatchSnapshot<State, Action, Seat> {
-    const outcome = this.game.rules.outcome(this.state)
+    const outcome = this.externalOutcome ?? this.game.rules.outcome(this.state)
     return {
       status: outcome ? 'finished' : 'active',
       gameId: this.game.manifest.id,
@@ -23,8 +24,13 @@ export class MatchRuntime<State, Action, Seat extends SeatId> {
   }
 
   legalActions(): readonly Action[] {
-    if (this.game.rules.outcome(this.state)) return []
+    if (this.snapshot().status === 'finished') return []
     return this.game.rules.legalActions(this.state)
+  }
+
+  finish(outcome: GameOutcome<Seat>): MatchSnapshot<State, Action, Seat> {
+    if (!this.externalOutcome) this.externalOutcome = outcome
+    return this.snapshot()
   }
 
   dispatch(action: Action): DispatchResult<State, Action, Seat> {
