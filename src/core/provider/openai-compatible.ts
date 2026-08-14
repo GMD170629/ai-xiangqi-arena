@@ -1,4 +1,5 @@
 import type { AiProvider, ChatCompletionRequest, ChatCompletionResult, ProviderConfig } from './types'
+import { runtimeFetch } from './runtime-fetch'
 
 function normalizeBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, '')
@@ -20,7 +21,7 @@ async function readError(response: Response): Promise<string> {
 }
 
 async function postCompletion(config: ProviderConfig, request: ChatCompletionRequest, signal: AbortSignal | undefined, includeResponseFormat: boolean): Promise<Response> {
-  return fetch(`${normalizeBaseUrl(config.baseUrl)}/chat/completions`, {
+  return runtimeFetch(`${normalizeBaseUrl(config.baseUrl)}/chat/completions`, {
     method: 'POST',
     headers: headers(config),
     signal,
@@ -38,13 +39,9 @@ export class OpenAiCompatibleProvider implements AiProvider {
 
   async complete(config: ProviderConfig, request: ChatCompletionRequest, signal?: AbortSignal): Promise<ChatCompletionResult> {
     let response = await postCompletion(config, request, signal, true)
-
-    // Some local OpenAI-compatible servers support chat/completions but not response_format.
-    // Retry once without that optional field to maximize Ollama/LM Studio/custom endpoint compatibility.
     if (!response.ok && request.responseFormat === 'json_object' && [400, 404, 422].includes(response.status)) {
       response = await postCompletion(config, request, signal, false)
     }
-
     if (!response.ok) throw new Error(`PROVIDER_HTTP_ERROR: ${await readError(response)}`)
 
     const body = await response.json() as {
@@ -68,7 +65,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
 
   async testConnection(config: ProviderConfig, signal?: AbortSignal): Promise<{ ok: boolean; message: string }> {
     try {
-      const response = await fetch(`${normalizeBaseUrl(config.baseUrl)}/models`, { headers: headers(config), signal })
+      const response = await runtimeFetch(`${normalizeBaseUrl(config.baseUrl)}/models`, { headers: headers(config), signal })
       if (!response.ok) return { ok: false, message: await readError(response) }
       return { ok: true, message: 'Provider reachable' }
     } catch (error) {
