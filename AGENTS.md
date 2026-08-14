@@ -15,153 +15,76 @@
 
 ## 2. 多游戏架构是硬约束
 
-平台必须支持未来加入五子棋、中国象棋等其他棋类。
+具体游戏只能存在于 `src/games/<game-id>/`。Core 中禁止出现 `rat/elephant/river`、`cannon/xiangqiFen`、`gomokuStone` 或 `if (gameId === "dou-shou-qi")` 等具体游戏概念。
 
-具体游戏只能存在于：
-
-```text
-src/games/<game-id>/
-```
-
-Core 中禁止出现具体游戏概念。例如以下内容出现在 `src/core` 视为架构违规：
-
-- `rat` / `elephant` / `river`
-- `cannon` / `xiangqiFen`
-- `gomokuStone`
-- `if (gameId === "dou-shou-qi")`
-
-禁止为了当前首版方便，把斗兽棋规则写入 Match Runtime 或 AI Runtime。
+新增五子棋、中国象棋等 Game Module 时，原则上不得修改 `core/match`、`core/ai`、`core/commander`、`core/personality`、`core/provider`，除非确实缺少新的跨游戏能力。
 
 ## 3. GameModule 边界
 
-每个游戏模块必须高内聚地拥有：
-
-- manifest
-- domain state
-- action 类型与 codec
-- rules / legal action generator
-- outcome 判断
-- AI state serializer / parser
-- 游戏专属 UI
-- 游戏专属 assets
-- 游戏专属 animations/audio/theme
-- 测试
-
-游戏模块通过统一 Contract 被平台加载。
-
-新增五子棋时，原则上不得修改：
-
-- `core/match`
-- `core/ai`
-- `core/commander`
-- `core/personality`
-- `core/provider`
+每个游戏模块必须高内聚拥有：manifest、domain state、Action 类型与 codec、rules/legal actions、outcome、AI adapter、游戏专属 UI/assets/animations/audio/theme 和测试。
 
 ## 4. Core Runtime
 
 ### Match Runtime
 
-负责：
-- 对局生命周期
-- seat / turn 推进
-- 暂停/继续
-- 技术失败恢复
-- 调用当前 GameModule
-- 事件记录与回放
-
-不得：
-- 理解具体游戏规则
-- 自动替 AI 选择 Action
-- 对 Action 做质量评估
+负责对局生命周期、seat/turn 推进、技术失败/外部终止、调用 GameModule、事件记录与回放。不得理解具体游戏规则、替 AI 选 Action 或评价 Action。
 
 ### AI Runtime
 
-负责：
-- 构造通用 AI Turn Request
-- 通过 GameAIAdapter 注入游戏状态与合法 Action
-- 调用 Provider
-- 解析结构化返回
-- 处理超时、格式错误、非法 Action 与重试
-
-不得直接解析某种游戏的坐标或动作语义。
+负责通用 Turn Request、GameAIAdapter、Provider 调用、Response 解析、超时/格式/非法 Action 重试。不得直接解析具体棋类坐标或动作语义。
 
 ### Commander
 
-负责：
-- 接收人类自然语言
-- 将消息绑定到指定 seat / AI
-- 按协议进入后续 AI 上下文
-
-不得把自然语言偷偷转换成一个强制 Action。
+只负责自然语言消息生命周期。不得把人类消息转换成强制 Action。
 
 ## 5. 首个 Game Module：斗兽棋
 
-首版 Game ID：`dou-shou-qi`
+- Game ID：`dou-shou-qi`
+- Rules Version：`classic-v1`
+- 权威规则：`docs/games/dou-shou-qi/RULES.md`
 
-规则版本：`classic-v1`
-
-权威项目规则：
-
-```text
-docs/games/dou-shou-qi/RULES.md
-```
-
-实现必须遵循文档，而不是依据开发者记忆自行决定存在争议的斗兽棋规则。
+争议规则以文档为准，不依据开发者记忆修改。
 
 ## 6. UI 与资源隔离
 
-通用 UI 可放在 `core/ui` 或 shared：
-- AI 对话
-- Provider 设置
-- 通用按钮/弹窗
-- 对局状态框架
-
-游戏专属视觉必须放在对应 Game Module：
-
-```text
-src/games/dou-shou-qi/ui/assets/
-src/games/dou-shou-qi/ui/animations/
-src/games/dou-shou-qi/ui/audio/
-```
-
-未来象棋、五子棋分别拥有自己的资源树。
-
-动画不得阻塞 Match 状态机；动画只消费已经提交的领域事件。
+通用产品 UI 可进入 shared/client；游戏专属视觉必须留在对应 `src/games/<game-id>/ui/` 下。动画不得阻塞 Match 状态机，只消费已经提交的领域状态/事件。
 
 ## 7. AI 输出原则
 
-协议使用通用 `action`，不要在 Core 写死 `move`：
+Core 使用通用 `action`：
 
 ```json
 {
   "action": "a3-a4",
-  "message": "我准备先把象向前压，逼它重新考虑右路。"
+  "message": "我准备先把象向前压。"
 }
 ```
 
-`message` 是面向玩家的简短说明，不要求模型暴露隐藏推理链。
+公开 `message` 不是隐藏推理链。
 
-## 8. 工程原则
+## 8. Provider、网络与密钥安全
+
+- OpenAI-Compatible 业务逻辑只能存在 Provider adapter。
+- 桌面端 Provider HTTP 必须经过 `runtimeFetch` / Tauri HTTP Client，不回退到 WebView fetch 处理 localhost/LAN 请求。
+- Web 调试模式允许使用浏览器 fetch，但不是正式桌面网络路径。
+- Provider 普通配置使用 Tauri Store。
+- API Key 必须使用 Stronghold Secret Vault；不得写入 Tauri Store、localStorage、日志、Match record 或仓库。
+- Web 调试模式不得持久保存 API Key，只允许当前内存会话使用。
+- Stronghold vault password 不得自动保存。
+- 删除/导出日志时继续遵守 secret redaction。
+- Tauri CSP 保持收紧；不要为了 Provider URL 把远程域名加入 WebView CSP，因为 Provider 请求由 Rust HTTP 插件执行。
+- HTTP 插件当前允许用户自定义 HTTP/HTTPS Provider URL，这是 BYO AI 的产品要求；不要再扩大为其他协议或远程脚本加载。
+
+## 9. 工程原则
 
 - TypeScript strict。
 - Core contract 与每个 GameModule 都必须有测试。
-- Prompt 必须版本化。
-- Rule version 必须版本化。
+- Prompt、Rule version 必须版本化。
 - 对局必须可记录和回放。
-- API Key 不得进入日志、仓库或对局记录。
 - Provider-specific 逻辑只能存在于 Provider adapter。
 - 任何趣味提示不得改变规则结果。
-- 不为未来需求过度抽象，但跨游戏边界必须从第一天严格保持。
+- 不为未来需求过度抽象，但跨游戏边界必须严格保持。
 
-## 9. MVP 范围控制
+## 10. MVP 范围控制
 
-除非明确修改 MVP 文档，不主动加入：
-- 排位/Elo
-- 好友系统
-- 商城
-- 技能/卡牌
-- AI 数值养成
-- 人类直接下棋
-- 最佳着分析
-- 中心化模型托管
-- 第二个 Game Module
+除非明确修改 MVP 文档，不主动加入：排位/Elo、好友、商城、技能/卡牌、AI 数值养成、人类直接下棋、最佳着分析、中心化模型托管、第二个 Game Module。
