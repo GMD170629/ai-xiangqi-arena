@@ -1,128 +1,111 @@
-# AI Xiangqi Arena
+# AI Board Arena
 
-> 一款“人类不能直接下棋”的中国象棋游戏。棋子只能由 AI 操作，人类玩家通过自然语言指挥自己的 AI 棋手。
+> 一个让 AI 真正成为棋手、人类只能通过语言影响 AI 的棋类对弈平台。
 
-## 产品一句话
+当前仓库名仍为 `ai-xiangqi-arena`，但产品定义已经从“AI 象棋”升级为 **通用 AI 棋类竞技场**。首个可玩 Game Module 改为 **斗兽棋（Dou Shou Qi）**。
 
-**你不能亲自走棋，你只能让 AI 理解你。**
+## 产品核心
 
-AI Xiangqi Arena 的核心不是“象棋引擎 + 聊天界面”，而是让大语言模型本身成为棋手：AI 读取棋盘、历史棋步、玩家指令和自身人格，自主选择下一步棋；游戏只负责象棋规则、回合推进与胜负裁定，不参与局面评价或最佳着计算。
+**游戏真正的玩法不是某一种棋，而是：AI 对弈 + 人类影响。**
 
-## 首版目标
+人类不是棋手，而是 Commander；AI 才是真正执行动作的 Player。
 
-首版只验证一个核心循环：
+```text
+Human Commander
+      │ natural language
+      ▼
+   AI Player
+      │ autonomous action
+      ▼
+  Game Module
+      │ validate/apply
+      ▼
+ Match Runtime
+```
 
-1. 创建一局 AI vs AI 的中国象棋对局。
-2. 红黑双方各绑定一个 AI 棋手。
-3. 人类玩家不能直接移动棋子。
-4. 人类可随时向己方 AI 发送自然语言指令。
-5. AI 根据棋局、人格和玩家指令自主决定走法。
-6. 游戏校验走法是否合法；非法则要求 AI 重试。
-7. AI 在关键时刻给出简短、有趣、符合人格的反馈。
-8. 棋盘通过适度动画呈现落子、将军、思考、拒绝指令、胜负等状态。
+人类不能拖动棋子、点击落点或直接提交一个动作。玩家只能表达判断、策略、情绪与建议，AI 可以接受、部分接受或拒绝，并自主决定最终动作。
+
+## 首版：斗兽棋
+
+首版从中国象棋切换为斗兽棋，原因是它更适合快速验证核心玩法：
+
+- 单局流程更短。
+- 规则更容易被不同规模的模型理解。
+- 动物等级、鼠吃象、河流、陷阱和兽穴天然具有趣味性。
+- AI 的聪明或离谱决定更容易被玩家看懂。
+- 适合验证游戏专属 UI、资源与动画如何作为模块隔离。
+
+首版使用项目规则版本：`dou-shou-qi/classic-v1`。
 
 ## 首版核心功能
 
-### 1. AI 对局
+- AI vs AI 自动对局。
+- 玩家选择己方 AI，并在对局过程中与其自然语言交流。
+- AI 人格预设与自定义人格。
+- OpenAI Compatible Provider，可连接 localhost / LAN / Cloud AI。
+- AI 自主动作、非法动作校验与重试。
+- 适度的游戏专属动画和人格化趣味反馈。
+- 完整对局、指令、AI 返回、动作、异常和 Provider 元数据记录。
 
-- AI vs AI 自动行棋。
-- 支持暂停、继续、重新开始、认输。
-- 显示当前回合、历史棋步、将军与胜负状态。
-- 保存完整对局记录。
+## 多游戏架构
 
-### 2. 人类与己方 AI 交互
+平台 Core 不知道斗兽棋中的鼠、象、河流，也不应该知道未来象棋中的炮或五子棋中的黑白子。
 
-玩家只能通过语言影响 AI，例如：
-
-- “先稳住，不要急着进攻。”
-- “重点压制他的右翼。”
-- “我觉得他在诱你吃子，谨慎一点。”
-- “别怕，主动把局面搞复杂。”
-
-AI 可以接受、部分接受或拒绝建议，但最终落子权始终属于 AI。
-
-### 3. AI 人格
-
-每个 AI 棋手可配置独立人格，例如：
-
-- 稳健老将
-- 激进挑战者
-- 冷静分析师
-- 嘴硬天才
-- 自定义人格
-
-人格影响 AI 的表达方式、风险偏好、对玩家建议的态度和总体风格，但不会由游戏代码直接决定棋步。
-
-### 4. AI 接入
-
-首版以 **OpenAI Compatible API** 为主要接入协议，允许用户连接自己的 AI：
-
-- 本机 AI 服务
-- 局域网 AI 服务
-- 云端兼容接口
-- Ollama / LM Studio / llama.cpp / vLLM 等兼容服务
-
-典型配置：
+每种游戏以高内聚 `GameModule` 接入：
 
 ```text
-Base URL
-API Key
-Model
+src/
+  core/
+    match/
+    ai/
+    commander/
+    personality/
+    provider/
+    persistence/
+    ui/
+  games/
+    dou-shou-qi/
+      domain/
+      ai/
+      ui/
+        components/
+        assets/
+        animations/
+        audio/
+        theme/
+    gomoku/      # future
+    xiangqi/     # future
 ```
 
-游戏本身不托管用户模型，也不要求所有棋局经过中心服务器。
+新增游戏原则上不修改 Match Runtime、AI Runtime、Commander 或 Provider。
 
-### 5. 动画与趣味反馈
+## 最重要的不变量
 
-首版不追求复杂特效，而强调“有反馈、有性格、不打扰”：
-
-- AI 思考时棋手头像/状态轻微呼吸。
-- 落子有短促位移动画。
-- 将军时棋盘与将帅区域短暂强调。
-- AI 拒绝玩家命令时给出人格化反馈。
-- 非法着重试时出现简短趣味提示。
-- 胜负结束时根据 AI 人格生成一句收尾话。
-
-详细规范见 [`docs/06-ANIMATION-FUN-FEEDBACK.md`](docs/06-ANIMATION-FUN-FEEDBACK.md)。
-
-## 最重要的产品规则
-
-- **禁止人类直接移动棋子。**
-- **禁止使用 Pikafish 等象棋决策引擎。**
-- 游戏规则层只能判断合法性、将军、将死、和棋与胜负。
-- 游戏不得计算局面分数、最佳着或推荐着法。
-- 所有实际走法必须由已配置的 AI Player 返回。
-- 玩家指令必须作为自然语言提供给 AI，不由游戏先转换成“攻击 +20 / 防御 +30”之类的隐藏数值。
-- AI 不必无条件服从玩家；它是棋手，不是遥控棋子。
+1. 人类不能直接产生游戏 Action。
+2. 所有实际 Action 必须来自当前 AI Player。
+3. Game Rules 只负责规则，不负责“哪一步更好”。
+4. 禁止引入最佳着搜索、局面评分或传统棋类决策引擎替 AI 下棋。
+5. AI 人格与模型分离。
+6. Game-specific 规则、UI、资产、动画必须留在对应 Game Module。
+7. Core 中不得出现具体游戏领域概念。
 
 ## 文档
 
-- [产品愿景](docs/00-PRODUCT-VISION.md)
-- [首版范围](docs/01-MVP-SCOPE.md)
-- [核心游戏规则](docs/02-CORE-GAME-RULES.md)
-- [AI 对局协议](docs/03-AI-PROTOCOL.md)
-- [AI 人格系统](docs/04-AI-PERSONALITY.md)
-- [人类与 AI 交互](docs/05-HUMAN-AI-INTERACTION.md)
-- [动效与趣味反馈](docs/06-ANIMATION-FUN-FEEDBACK.md)
-- [AI Provider 规范](docs/07-AI-PROVIDER-SPEC.md)
-- [技术架构](docs/08-TECH-ARCHITECTURE.md)
-- [数据模型](docs/09-DATA-MODEL.md)
-- [MVP 路线图](docs/10-MVP-ROADMAP.md)
+从 [`docs/INDEX.md`](docs/INDEX.md) 开始。
 
-## 推荐开发顺序
+重点：
 
-```text
-M0  文档与协议定型
-M1  象棋规则与棋局状态机
-M2  AI Provider 与单 AI 自动落子
-M3  AI vs AI 完整对局
-M4  Commander 自然语言指挥
-M5  AI 人格、动效与趣味反馈
-M6  对局记录与首版打磨
-```
+- `docs/00-PRODUCT-VISION.md`：产品愿景
+- `docs/01-MVP-SCOPE.md`：首版范围
+- `docs/02-CORE-GAME-RULES.md`：平台核心规则
+- `docs/03-AI-PROTOCOL.md`：通用 AI 对局协议
+- `docs/11-GAME-MODULE-SPEC.md`：Game Module 抽象
+- `docs/12-PLATFORM-PRINCIPLES.md`：Platform-first 原则
+- `docs/games/dou-shou-qi/RULES.md`：斗兽棋 `classic-v1`
+- `docs/games/dou-shou-qi/PRESENTATION.md`：斗兽棋视觉与资源规范
 
-## 当前状态
+## 当前阶段
 
-项目处于 **M0：产品与协议定型**。
+M0：产品与协议定型。
 
-下一阶段的第一项开发验收不是“做出漂亮棋盘”，而是让两个真实 AI 在无人工移动棋子的情况下，从开局稳定走到一局结束。
+下一步进入 M1：**建立平台 Core + GameModule Contract + 斗兽棋规则模块**，而不是先写一个只能运行斗兽棋的耦合应用。
